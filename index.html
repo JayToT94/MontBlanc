@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>Travel Journal</title>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#0f0f13"/>
+<script src="data.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f13;--surface:#1a1a22;--card:#22222e;--card-hover:#2a2a38;
+  --border:#2e2e3e;--accent:#7c6ef5;--accent-dim:#3d3678;--accent-soft:#2a2540;
+  --text:#e8e8f0;--muted:#8888a0;--danger:#e05555;--success:#4caf7d;
+  --radius:12px;--tab-h:60px;
+}
+html,body{height:100%;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column}
+
+/* ── VIEWS ── */
+#app{flex:1;overflow:hidden;position:relative}
+.view{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .18s}
+.view.active{opacity:1;pointer-events:all}
+
+/* ── TAB BAR ── */
+#tabbar{height:var(--tab-h);background:var(--surface);border-top:1px solid var(--border);display:flex;flex-shrink:0;z-index:100}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--muted);font-size:.65rem;font-weight:500;letter-spacing:.04em;text-transform:uppercase;transition:color .15s;-webkit-tap-highlight-color:transparent;border:none;background:none}
+.tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab.active{color:var(--accent)}
+
+/* ── TOP BAR ── */
+.top-bar{background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.75rem;padding:.85rem 1rem;flex-shrink:0}
+.top-bar-title{font-size:1rem;font-weight:600;flex:1}
+.back-btn,.icon-btn{background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;width:36px;height:36px;flex-shrink:0;transition:background .15s;-webkit-tap-highlight-color:transparent}
+.back-btn svg,.icon-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.back-btn:active,.icon-btn:active{transform:scale(.95)}
+
+/* ── SCROLL AREA ── */
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.inner{padding:1rem;max-width:540px;margin:0 auto;display:flex;flex-direction:column;gap:.65rem}
+
+/* ── HOME ── */
+#view-home .inner{padding-top:1.5rem}
+.home-header{margin-bottom:.5rem}
+.home-header h1{font-size:1.4rem;font-weight:700}
+.home-header p{color:var(--muted);font-size:.85rem;margin-top:3px}
+.section-label{font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:.75rem 0 .4rem}
+
+/* ── CARDS ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;cursor:pointer;display:flex;align-items:center;gap:.85rem;transition:background .15s,border-color .15s,transform .1s;-webkit-tap-highlight-color:transparent}
+.card:active{transform:scale(.98)}
+.card:hover{background:var(--card-hover);border-color:var(--accent-dim)}
+.card-icon{width:40px;height:40px;border-radius:10px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.card-icon svg{width:20px;height:20px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.card-name{font-size:.95rem;font-weight:500}
+.card-sub{font-size:.75rem;color:var(--muted);margin-top:2px}
+.card-arrow{color:var(--muted);margin-left:auto;font-size:1.1rem}
+
+/* ── IMAGE LIST ── */
+.img-item{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:.8rem .9rem;cursor:pointer;display:flex;align-items:center;gap:.85rem;transition:background .15s,transform .1s;-webkit-tap-highlight-color:transparent}
+.img-item:active{transform:scale(.98)}
+.img-item:hover{background:var(--card-hover)}
+.thumb{width:52px;height:52px;border-radius:8px;object-fit:cover;background:var(--border);flex-shrink:0}
+.img-title{font-size:.9rem;font-weight:500}
+.img-file{font-size:.72rem;color:var(--muted);margin-top:2px}
+
+/* ── PREVIEW ── */
+#view-preview .scroll{display:flex;flex-direction:column}
+.preview-body{padding:1rem;max-width:600px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:1rem}
+.preview-title{font-size:1.15rem;font-weight:600}
+.img-wrap{border-radius:14px;overflow:hidden;border:1px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:center}
+#preview-img{width:100%;height:auto;max-height:62vh;object-fit:contain;display:block}
+.preview-nav{display:flex;gap:.65rem}
+.nav-btn{flex:1;padding:.65rem;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.35rem;transition:background .15s;-webkit-tap-highlight-color:transparent}
+.nav-btn:disabled{opacity:.3;cursor:default}
+.nav-btn:not(:disabled):hover{background:var(--card-hover)}
+.nav-btn:not(:disabled):active{transform:scale(.97)}
+.nav-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── JOURNAL LIST ── */
+.entry-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;cursor:pointer;transition:background .15s,transform .1s;-webkit-tap-highlight-color:transparent}
+.entry-card:active{transform:scale(.98)}
+.entry-card:hover{background:var(--card-hover)}
+.entry-date{font-size:.7rem;color:var(--accent);font-weight:600;letter-spacing:.04em;margin-bottom:.3rem}
+.entry-title{font-size:.95rem;font-weight:600;margin-bottom:.3rem}
+.entry-preview{font-size:.8rem;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.entry-photos-row{display:flex;gap:.4rem;margin-top:.6rem;overflow:hidden}
+.entry-photo-thumb{width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0;border:1px solid var(--border)}
+
+.fab{position:fixed;bottom:calc(var(--tab-h) + 16px);right:16px;width:52px;height:52px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(124,110,245,.4);z-index:50;-webkit-tap-highlight-color:transparent;transition:transform .15s}
+.fab:active{transform:scale(.92)}
+.fab svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── ENTRY VIEW ── */
+.entry-view-date{font-size:.75rem;color:var(--accent);font-weight:600;letter-spacing:.04em;padding:.2rem 0}
+.entry-view-title{font-size:1.2rem;font-weight:700;line-height:1.3}
+.entry-view-body{font-size:.9rem;line-height:1.75;color:#cccce0;white-space:pre-wrap}
+.linked-photos{display:flex;flex-direction:column;gap:.5rem}
+.linked-photo-wrap{border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+.linked-photo-wrap img{width:100%;height:auto;display:block;max-height:50vh;object-fit:contain;background:var(--card)}
+.linked-photo-caption{font-size:.75rem;color:var(--muted);padding:.4rem .6rem;background:var(--card)}
+
+/* ── EDITOR ── */
+.editor-inner{padding:1rem;max-width:540px;margin:0 auto;display:flex;flex-direction:column;gap:.85rem}
+.field-label{font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+input.field,textarea.field{width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;font-size:.9rem;padding:.7rem .9rem;outline:none;transition:border-color .15s;resize:none}
+input.field:focus,textarea.field:focus{border-color:var(--accent)}
+textarea.field{min-height:180px;line-height:1.7}
+.date-row{display:flex;gap:.5rem;align-items:center}
+input[type=date].field{flex:1;color-scheme:dark}
+
+.photo-picker{display:flex;flex-direction:column;gap:.5rem}
+.photo-pick-btn{background:var(--accent-soft);border:1px dashed var(--accent-dim);border-radius:10px;color:var(--accent);font-size:.85rem;padding:.75rem;text-align:center;cursor:pointer;transition:background .15s;-webkit-tap-highlight-color:transparent}
+.photo-pick-btn:hover{background:var(--accent-dim)}
+.linked-list{display:flex;flex-direction:column;gap:.4rem}
+.linked-item{display:flex;align-items:center;gap:.6rem;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem}
+.linked-item img{width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0}
+.linked-item-title{font-size:.82rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.linked-item-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem;padding:0 .2rem;line-height:1;-webkit-tap-highlight-color:transparent}
+.linked-item-remove:hover{color:var(--danger)}
+
+.save-btn{background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:.95rem;font-weight:600;padding:.85rem;cursor:pointer;transition:opacity .15s;-webkit-tap-highlight-color:transparent}
+.save-btn:active{opacity:.85}
+.delete-btn{background:none;border:1px solid var(--danger);border-radius:10px;color:var(--danger);font-size:.85rem;padding:.7rem;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.delete-btn:active{opacity:.7}
+
+/* ── PHOTO PICKER MODAL ── */
+#photo-modal{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;flex-direction:column}
+#photo-modal.open{display:flex}
+.modal-box{background:var(--surface);border-radius:16px 16px 0 0;margin-top:auto;max-height:75vh;display:flex;flex-direction:column}
+.modal-header{padding:1rem 1rem .5rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-title{font-size:.95rem;font-weight:600}
+.modal-close{background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:0 .2rem}
+.modal-scroll{overflow-y:auto;padding:.75rem;display:flex;flex-direction:column;gap:.4rem}
+.modal-folder-label{font-size:.7rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:.5rem 0 .25rem}
+.modal-img-item{display:flex;align-items:center;gap:.7rem;padding:.5rem .6rem;border-radius:8px;cursor:pointer;transition:background .12s;-webkit-tap-highlight-color:transparent}
+.modal-img-item:hover{background:var(--card-hover)}
+.modal-img-item img{width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0}
+.modal-img-title{font-size:.85rem;flex:1}
+.modal-img-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:background .12s,border-color .12s}
+.modal-img-check.checked{background:var(--accent);border-color:var(--accent)}
+.modal-img-check.checked::after{content:"✓";font-size:.7rem;color:#fff}
+.modal-footer{padding:.75rem 1rem;border-top:1px solid var(--border);flex-shrink:0}
+.modal-confirm{width:100%;background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:.9rem;font-weight:600;padding:.75rem;cursor:pointer}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:3rem 1.5rem;color:var(--muted)}
+.empty svg{width:44px;height:44px;stroke:var(--muted);fill:none;stroke-width:1.2;margin-bottom:.75rem}
+.empty p{font-size:.85rem;line-height:1.6}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- HOME -->
+  <div class="view active" id="view-home">
+    <div class="scroll"><div class="inner">
+      <div class="home-header">
+        <h1>Travel Journal</h1>
+        <p>Your photos &amp; memories</p>
+      </div>
+      <div class="section-label">Photo Albums</div>
+      <div id="folder-list"></div>
+      <div class="section-label">Journal</div>
+      <div class="card" id="home-journal-btn">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </div>
+        <div>
+          <div class="card-name">Journal</div>
+          <div class="card-sub" id="journal-count-home">0 entries</div>
+        </div>
+        <span class="card-arrow">›</span>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- IMAGE LIST -->
+  <div class="view" id="view-list">
+    <div class="top-bar">
+      <button class="back-btn" id="list-back"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <span class="top-bar-title" id="list-title"></span>
+    </div>
+    <div class="scroll"><div class="inner" id="image-list"></div></div>
+  </div>
+
+  <!-- IMAGE PREVIEW -->
+  <div class="view" id="view-preview">
+    <div class="top-bar">
+      <button class="back-btn" id="preview-back"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <span class="top-bar-title" id="preview-folder-label"></span>
+    </div>
+    <div class="scroll">
+      <div class="preview-body">
+        <p class="preview-title" id="preview-title"></p>
+        <div class="img-wrap"><img id="preview-img" src="" alt=""/></div>
+        <div class="preview-nav">
+          <button class="nav-btn" id="prev-btn"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg> Previous</button>
+          <button class="nav-btn" id="next-btn">Next <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JOURNAL LIST -->
+  <div class="view" id="view-journal">
+    <div class="top-bar">
+      <button class="back-btn" id="journal-back"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <span class="top-bar-title">Journal</span>
+    </div>
+    <div class="scroll"><div class="inner" id="journal-list"></div></div>
+    <button class="fab" id="new-entry-btn"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+  </div>
+
+  <!-- ENTRY VIEW -->
+  <div class="view" id="view-entry">
+    <div class="top-bar">
+      <button class="back-btn" id="entry-back"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <span class="top-bar-title" id="entry-view-folder-label">Entry</span>
+      <button class="icon-btn" id="entry-edit-btn"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+    </div>
+    <div class="scroll"><div class="inner">
+      <p class="entry-view-date" id="entry-view-date"></p>
+      <p class="entry-view-title" id="entry-view-title"></p>
+      <p class="entry-view-body" id="entry-view-body"></p>
+      <div class="linked-photos" id="entry-view-photos"></div>
+    </div></div>
+  </div>
+
+  <!-- EDITOR -->
+  <div class="view" id="view-editor">
+    <div class="top-bar">
+      <button class="back-btn" id="editor-back"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <span class="top-bar-title" id="editor-title-bar">New Entry</span>
+    </div>
+    <div class="scroll"><div class="editor-inner">
+      <div>
+        <div class="field-label">Date</div>
+        <input type="date" class="field" id="ed-date"/>
+      </div>
+      <div>
+        <div class="field-label">Title</div>
+        <input type="text" class="field" id="ed-title" placeholder="Give this day a name…"/>
+      </div>
+      <div>
+        <div class="field-label">Notes</div>
+        <textarea class="field" id="ed-body" placeholder="Write about your day…"></textarea>
+      </div>
+      <div>
+        <div class="field-label">Linked Photos</div>
+        <div class="photo-picker">
+          <div class="linked-list" id="ed-linked-list"></div>
+          <div class="photo-pick-btn" id="open-photo-modal">+ From albums</div>
+          <div class="photo-pick-btn" id="open-gallery-btn">+ From camera roll</div>
+          <input type="file" id="gallery-input" accept="image/*" multiple style="display:none"/>
+        </div>
+      </div>
+      <button class="save-btn" id="save-btn">Save Entry</button>
+      <button class="delete-btn" id="delete-btn" style="display:none">Delete Entry</button>
+    </div></div>
+  </div>
+
+</div>
+
+<!-- TAB BAR -->
+<div id="tabbar">
+  <button class="tab active" data-tab="home">
+    <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    Home
+  </button>
+  <button class="tab" data-tab="journal">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    Journal
+  </button>
+</div>
+
+<!-- PHOTO PICKER MODAL -->
+<div id="photo-modal">
+  <div style="flex:1" id="modal-backdrop"></div>
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Link a photo</span>
+      <button class="modal-close" id="modal-close">×</button>
+    </div>
+    <div class="modal-scroll" id="modal-scroll"></div>
+    <div class="modal-footer">
+      <button class="modal-confirm" id="modal-confirm">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Storage ──────────────────────────────────────────────────────────────────
+const DB_KEY = "travel_journal_entries";
+function loadEntries(){try{return JSON.parse(localStorage.getItem(DB_KEY)||"[]")}catch{return[]}}
+function saveEntries(e){localStorage.setItem(DB_KEY,JSON.stringify(e))}
+
+// ── State ────────────────────────────────────────────────────────────────────
+let currentFolder=null, currentImgIdx=0, editingId=null;
+let edLinked=[];   // [{folderId, file, title, src}]
+let modalSelected=new Set();
+
+// ── View router ──────────────────────────────────────────────────────────────
+const views={};
+document.querySelectorAll(".view").forEach(v=>views[v.id]=v);
+function show(id){Object.values(views).forEach(v=>v.classList.remove("active"));views[id].classList.add("active")}
+
+// ── Tab bar ──────────────────────────────────────────────────────────────────
+document.querySelectorAll(".tab").forEach(tab=>{
+  tab.addEventListener("click",()=>{
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+    tab.classList.add("active");
+    if(tab.dataset.tab==="home"){show("view-home");refreshHome()}
+    else{show("view-journal");renderJournal()}
+  });
+});
+
+// ── Home ─────────────────────────────────────────────────────────────────────
+function refreshHome(){
+  const entries=loadEntries();
+  const n=entries.length;
+  document.getElementById("journal-count-home").textContent=n+" entr"+(n===1?"y":"ies");
+}
+
+const folderList=document.getElementById("folder-list");
+(FOLDERS||[]).forEach(folder=>{
+  const card=document.createElement("div");
+  card.className="card";
+  card.innerHTML=`
+    <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></div>
+    <div><div class="card-name">${folder.name}</div><div class="card-sub">${folder.images.length} image${folder.images.length!==1?"s":""}</div></div>
+    <span class="card-arrow">›</span>`;
+  card.addEventListener("click",()=>openFolder(folder));
+  folderList.appendChild(card);
+});
+document.getElementById("home-journal-btn").addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  document.querySelector('[data-tab="journal"]').classList.add("active");
+  show("view-journal");renderJournal();
+});
+
+// ── Image list ───────────────────────────────────────────────────────────────
+function openFolder(folder){
+  currentFolder=folder;
+  document.getElementById("list-title").textContent=folder.name;
+  const list=document.getElementById("image-list");
+  list.innerHTML="";
+  if(!folder.images.length){
+    list.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><p>No images in this folder.</p></div>`;
+  } else {
+    folder.images.forEach((img,idx)=>{
+      const item=document.createElement("div");
+      item.className="img-item";
+      item.innerHTML=`<img class="thumb" src="${img.src}" alt="${img.title}"/><div><div class="img-title">${img.title}</div><div class="img-file">${img.file}</div></div>`;
+      item.addEventListener("click",()=>openPreview(idx));
+      list.appendChild(item);
+    });
+  }
+  show("view-list");
+}
+document.getElementById("list-back").addEventListener("click",()=>{show("view-home");refreshHome()});
+
+// ── Image preview ────────────────────────────────────────────────────────────
+function openPreview(idx){
+  currentImgIdx=idx;
+  const img=currentFolder.images[idx];
+  document.getElementById("preview-title").textContent=img.title;
+  document.getElementById("preview-folder-label").textContent=currentFolder.name;
+  document.getElementById("preview-img").src=img.src;
+  document.getElementById("prev-btn").disabled=(idx===0);
+  document.getElementById("next-btn").disabled=(idx===currentFolder.images.length-1);
+  show("view-preview");
+}
+document.getElementById("preview-back").addEventListener("click",()=>openFolder(currentFolder));
+document.getElementById("prev-btn").addEventListener("click",()=>openPreview(currentImgIdx-1));
+document.getElementById("next-btn").addEventListener("click",()=>openPreview(currentImgIdx+1));
+
+// ── Journal list ─────────────────────────────────────────────────────────────
+function renderJournal(){
+  refreshHome();
+  const entries=loadEntries().sort((a,b)=>b.date.localeCompare(a.date));
+  const list=document.getElementById("journal-list");
+  list.innerHTML="";
+  if(!entries.length){
+    list.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><p>No entries yet.<br>Tap + to write your first one.</p></div>`;
+    return;
+  }
+  entries.forEach(entry=>{
+    const card=document.createElement("div");
+    card.className="entry-card";
+    const photosHtml=entry.photos&&entry.photos.length
+      ? `<div class="entry-photos-row">${entry.photos.slice(0,4).map(p=>`<img class="entry-photo-thumb" src="${p.src}" alt="${p.title}">`).join("")}</div>`:"";
+    card.innerHTML=`
+      <div class="entry-date">${formatDate(entry.date)}</div>
+      <div class="entry-title">${entry.title||"Untitled"}</div>
+      <div class="entry-preview">${entry.body||""}</div>
+      ${photosHtml}`;
+    card.addEventListener("click",()=>openEntry(entry.id));
+    list.appendChild(card);
+  });
+}
+document.getElementById("journal-back").addEventListener("click",()=>{show("view-home");refreshHome()});
+document.getElementById("new-entry-btn").addEventListener("click",()=>openEditor(null));
+
+// ── Entry view ───────────────────────────────────────────────────────────────
+function openEntry(id){
+  const entry=loadEntries().find(e=>e.id===id);
+  if(!entry)return;
+  document.getElementById("entry-view-date").textContent=formatDate(entry.date);
+  document.getElementById("entry-view-title").textContent=entry.title||"Untitled";
+  document.getElementById("entry-view-body").textContent=entry.body||"";
+  const ph=document.getElementById("entry-view-photos");
+  ph.innerHTML="";
+  (entry.photos||[]).forEach(p=>{
+    const wrap=document.createElement("div");
+    wrap.className="linked-photo-wrap";
+    wrap.innerHTML=`<img src="${p.src}" alt="${p.title}"/><div class="linked-photo-caption">${p.title}</div>`;
+    ph.appendChild(wrap);
+  });
+  document.getElementById("entry-edit-btn").onclick=()=>openEditor(id);
+  show("view-entry");
+}
+document.getElementById("entry-back").addEventListener("click",()=>{show("view-journal");renderJournal()});
+
+// ── Editor ───────────────────────────────────────────────────────────────────
+function openEditor(id){
+  editingId=id;
+  edLinked=[];
+  document.getElementById("editor-title-bar").textContent=id?"Edit Entry":"New Entry";
+  document.getElementById("delete-btn").style.display=id?"block":"none";
+  if(id){
+    const entry=loadEntries().find(e=>e.id===id);
+    document.getElementById("ed-date").value=entry.date||"";
+    document.getElementById("ed-title").value=entry.title||"";
+    document.getElementById("ed-body").value=entry.body||"";
+    edLinked=(entry.photos||[]).map(p=>({...p}));
+  } else {
+    document.getElementById("ed-date").value=todayStr();
+    document.getElementById("ed-title").value="";
+    document.getElementById("ed-body").value="";
+  }
+  renderLinkedList();
+  show("view-editor");
+}
+document.getElementById("editor-back").addEventListener("click",()=>{
+  if(editingId)openEntry(editingId); else{show("view-journal");renderJournal();}
+});
+
+function renderLinkedList(){
+  const list=document.getElementById("ed-linked-list");
+  list.innerHTML="";
+  edLinked.forEach((p,idx)=>{
+    const item=document.createElement("div");
+    item.className="linked-item";
+    item.innerHTML=`<img src="${p.src}" alt="${p.title}"/><span class="linked-item-title">${p.title}</span><button class="linked-item-remove" data-idx="${idx}">×</button>`;
+    list.appendChild(item);
+  });
+  list.querySelectorAll(".linked-item-remove").forEach(btn=>{
+    btn.addEventListener("click",()=>{edLinked.splice(+btn.dataset.idx,1);renderLinkedList();});
+  });
+}
+
+document.getElementById("save-btn").addEventListener("click",()=>{
+  const date=document.getElementById("ed-date").value;
+  const title=document.getElementById("ed-title").value.trim();
+  const body=document.getElementById("ed-body").value.trim();
+  if(!title&&!body){alert("Please add a title or some notes.");return;}
+  const entries=loadEntries();
+  if(editingId){
+    const idx=entries.findIndex(e=>e.id===editingId);
+    if(idx>-1)entries[idx]={...entries[idx],date,title,body,photos:[...edLinked]};
+  } else {
+    entries.push({id:Date.now(),date,title,body,photos:[...edLinked]});
+  }
+  saveEntries(entries);
+  show("view-journal");renderJournal();
+});
+
+document.getElementById("delete-btn").addEventListener("click",()=>{
+  if(!confirm("Delete this entry?"))return;
+  const entries=loadEntries().filter(e=>e.id!==editingId);
+  saveEntries(entries);
+  show("view-journal");renderJournal();
+});
+
+// ── Photo picker modal ────────────────────────────────────────────────────────
+const modal=document.getElementById("photo-modal");
+
+document.getElementById("open-photo-modal").addEventListener("click",()=>{
+  modalSelected=new Set(edLinked.map(p=>p.folderId+"::"+p.file));
+  buildModalList();
+  modal.classList.add("open");
+});
+document.getElementById("modal-close").addEventListener("click",()=>modal.classList.remove("open"));
+document.getElementById("modal-backdrop").addEventListener("click",()=>modal.classList.remove("open"));
+
+function buildModalList(){
+  const scroll=document.getElementById("modal-scroll");
+  scroll.innerHTML="";
+  (FOLDERS||[]).forEach(folder=>{
+    if(!folder.images.length)return;
+    const label=document.createElement("div");
+    label.className="modal-folder-label";
+    label.textContent=folder.name;
+    scroll.appendChild(label);
+    folder.images.forEach(img=>{
+      const key=folder.id+"::"+img.file;
+      const row=document.createElement("div");
+      row.className="modal-img-item";
+      const checked=modalSelected.has(key);
+      row.innerHTML=`<img src="${img.src}" alt="${img.title}"/><span class="modal-img-title">${img.title}</span><div class="modal-img-check${checked?" checked":""}"></div>`;
+      row.addEventListener("click",()=>{
+        if(modalSelected.has(key))modalSelected.delete(key); else modalSelected.add(key);
+        row.querySelector(".modal-img-check").classList.toggle("checked",modalSelected.has(key));
+      });
+      scroll.appendChild(row);
+    });
+  });
+}
+
+document.getElementById("modal-confirm").addEventListener("click",()=>{
+  edLinked=[];
+  (FOLDERS||[]).forEach(folder=>{
+    folder.images.forEach(img=>{
+      const key=folder.id+"::"+img.file;
+      if(modalSelected.has(key))edLinked.push({folderId:folder.id,file:img.file,title:img.title,src:img.src});
+    });
+  });
+  renderLinkedList();
+  modal.classList.remove("open");
+});
+
+// ── Camera roll picker ───────────────────────────────────────────────────────
+document.getElementById("open-gallery-btn").addEventListener("click",()=>{
+  document.getElementById("gallery-input").click();
+});
+
+document.getElementById("gallery-input").addEventListener("change",function(){
+  const files=Array.from(this.files);
+  if(!files.length)return;
+  let loaded=0;
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const name=file.name.replace(/\.[^.]+$/,"").replace(/[_-]/g," ").replace(/\s+/g," ").trim();
+      const title=name.charAt(0).toUpperCase()+name.slice(1)||"Photo";
+      edLinked.push({folderId:"gallery",file:file.name,title,src:e.target.result});
+      loaded++;
+      if(loaded===files.length)renderLinkedList();
+    };
+    reader.readAsDataURL(file);
+  });
+  this.value="";
+});
+
+// ── Utils ────────────────────────────────────────────────────────────────────
+function todayStr(){const d=new Date();return d.toISOString().slice(0,10)}
+function formatDate(str){
+  if(!str)return"";
+  const [y,m,d]=str.split("-");
+  const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return`${d} ${months[+m-1]} ${y}`;
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+refreshHome();
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("./sw.js").catch(()=>{});
+}
+</script>
+</body>
+</html>
