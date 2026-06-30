@@ -125,6 +125,18 @@ input[type=date].field{flex:1;color-scheme:dark}
 .delete-btn{background:none;border:1px solid var(--danger);border-radius:10px;color:var(--danger);font-size:.85rem;padding:.7rem;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .delete-btn:active{opacity:.7}
 
+/* ── FULLSCREEN VIEWER ── */
+#fs-overlay{position:fixed;inset:0;background:#000;z-index:300;display:none;flex-direction:column;touch-action:none}
+#fs-overlay.open{display:flex}
+#fs-close{position:absolute;top:16px;right:16px;z-index:10;background:rgba(0,0,0,.5);border:none;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#fs-close svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#fs-canvas{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative}
+#fs-img{max-width:100%;max-height:100%;object-fit:contain;transform-origin:center center;transition:transform .05s linear;user-select:none;-webkit-user-select:none;pointer-events:none}
+#fs-nav-prev,#fs-nav-next{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.4);border:none;color:#fff;font-size:1.8rem;padding:.4rem .7rem;cursor:pointer;border-radius:8px;z-index:5;-webkit-tap-highlight-color:transparent}
+#fs-nav-prev{left:8px}
+#fs-nav-next{right:8px}
+#fs-nav-prev:disabled,#fs-nav-next:disabled{opacity:.2;cursor:default}
+
 /* ── PHOTO PICKER MODAL ── */
 #photo-modal{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;flex-direction:column}
 #photo-modal.open{display:flex}
@@ -276,6 +288,16 @@ input[type=date].field{flex:1;color-scheme:dark}
   </button>
 </div>
 
+<!-- FULLSCREEN VIEWER -->
+<div id="fs-overlay">
+  <button id="fs-close"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  <div id="fs-canvas">
+    <img id="fs-img" src="" alt=""/>
+    <button id="fs-nav-prev">‹</button>
+    <button id="fs-nav-next">›</button>
+  </div>
+</div>
+
 <!-- PHOTO PICKER MODAL -->
 <div id="photo-modal">
   <div style="flex:1" id="modal-backdrop"></div>
@@ -354,7 +376,7 @@ function openFolder(folder){
       const item=document.createElement("div");
       item.className="img-item";
       item.innerHTML=`<img class="thumb" src="${img.src}" alt="${img.title}"/><div><div class="img-title">${img.title}</div><div class="img-file">${img.file}</div></div>`;
-      item.addEventListener("click",()=>openPreview(idx));
+      item.addEventListener("click",()=>fsOpen(idx));
       list.appendChild(item);
     });
   }
@@ -373,6 +395,7 @@ function openPreview(idx){
   document.getElementById("next-btn").disabled=(idx===currentFolder.images.length-1);
   show("view-preview");
 }
+document.getElementById("preview-img").addEventListener("click",()=>fsOpen(currentImgIdx));
 document.getElementById("preview-back").addEventListener("click",()=>openFolder(currentFolder));
 document.getElementById("prev-btn").addEventListener("click",()=>openPreview(currentImgIdx-1));
 document.getElementById("next-btn").addEventListener("click",()=>openPreview(currentImgIdx+1));
@@ -554,6 +577,99 @@ document.getElementById("gallery-input").addEventListener("change",function(){
   });
   this.value="";
 });
+
+// ── Fullscreen viewer + pinch-to-zoom ────────────────────────────────────────
+const fsOverlay = document.getElementById("fs-overlay");
+const fsImg     = document.getElementById("fs-img");
+const fsClose   = document.getElementById("fs-close");
+const fsPrev    = document.getElementById("fs-nav-prev");
+const fsNext    = document.getElementById("fs-nav-next");
+
+let fsScale = 1, fsDx = 0, fsDy = 0;
+let pinchStartDist = 0, pinchStartScale = 1;
+let panStartX = 0, panStartY = 0, panStartDx = 0, panStartDy = 0;
+let isPinching = false;
+
+function fsOpen(idx) {
+  currentImgIdx = idx;
+  const img = currentFolder.images[idx];
+  fsImg.src = img.src;
+  fsImg.alt = img.title;
+  fsScale = 1; fsDx = 0; fsDy = 0;
+  applyTransform();
+  fsPrev.disabled = idx === 0;
+  fsNext.disabled = idx === currentFolder.images.length - 1;
+  fsOverlay.classList.add("open");
+}
+
+function fsClose_(){
+  fsOverlay.classList.remove("open");
+  fsScale = 1; fsDx = 0; fsDy = 0;
+}
+
+function applyTransform(){
+  fsImg.style.transform = `translate(${fsDx}px,${fsDy}px) scale(${fsScale})`;
+}
+
+function clampPan(){
+  const canvas = document.getElementById("fs-canvas");
+  const maxX = Math.max(0, (fsImg.naturalWidth * fsScale - canvas.clientWidth)  / 2);
+  const maxY = Math.max(0, (fsImg.naturalHeight * fsScale - canvas.clientHeight) / 2);
+  fsDx = Math.max(-maxX, Math.min(maxX, fsDx));
+  fsDy = Math.max(-maxY, Math.min(maxY, fsDy));
+}
+
+function dist(t){ return Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY); }
+function midpoint(t){ return {x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2}; }
+
+const canvas = document.getElementById("fs-canvas");
+
+canvas.addEventListener("touchstart", e => {
+  if(e.touches.length === 2){
+    isPinching = true;
+    pinchStartDist  = dist(e.touches);
+    pinchStartScale = fsScale;
+  } else if(e.touches.length === 1){
+    isPinching = false;
+    panStartX  = e.touches[0].clientX;
+    panStartY  = e.touches[0].clientY;
+    panStartDx = fsDx;
+    panStartDy = fsDy;
+  }
+}, {passive:true});
+
+canvas.addEventListener("touchmove", e => {
+  e.preventDefault();
+  if(e.touches.length === 2 && isPinching){
+    const newDist = dist(e.touches);
+    fsScale = Math.min(8, Math.max(1, pinchStartScale * newDist / pinchStartDist));
+    if(fsScale <= 1){ fsDx = 0; fsDy = 0; }
+    else clampPan();
+    applyTransform();
+  } else if(e.touches.length === 1 && !isPinching && fsScale > 1){
+    fsDx = panStartDx + e.touches[0].clientX - panStartX;
+    fsDy = panStartDy + e.touches[0].clientY - panStartY;
+    clampPan();
+    applyTransform();
+  }
+}, {passive:false});
+
+canvas.addEventListener("touchend", e => {
+  if(e.touches.length < 2) isPinching = false;
+  if(fsScale < 1){ fsScale = 1; fsDx = 0; fsDy = 0; applyTransform(); }
+}, {passive:true});
+
+// Double-tap to reset zoom
+let lastTap = 0;
+canvas.addEventListener("touchend", e => {
+  const now = Date.now();
+  if(now - lastTap < 300){ fsScale=1; fsDx=0; fsDy=0; applyTransform(); }
+  lastTap = now;
+}, {passive:true});
+
+fsClose.addEventListener("click", fsClose_);
+fsPrev.addEventListener("click", () => { fsScale=1;fsDx=0;fsDy=0; fsOpen(currentImgIdx-1); });
+fsNext.addEventListener("click", () => { fsScale=1;fsDx=0;fsDy=0; fsOpen(currentImgIdx+1); });
 
 // ── Utils ────────────────────────────────────────────────────────────────────
 function todayStr(){const d=new Date();return d.toISOString().slice(0,10)}
